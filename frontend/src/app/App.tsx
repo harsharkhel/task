@@ -1,60 +1,23 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { Sidebar, type NavPage } from "./components/Sidebar";
 import { Dashboard, type Task } from "./components/Dashboard";
 import { TaskModal } from "./components/TaskModal";
-import { fetchTasks, createTask, updateTask, deleteTask } from "./api";
+import { Analytics } from "./components/Analytics";
+
+function generateId() {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("Dashboard");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  const loadTasks = useCallback(async () => {
-    try {
-      const data = await fetchTasks();
-      setTasks(data);
-    } catch (err) {
-      console.error("Failed to load tasks:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadTasks();
-  }, [loadTasks]);
-
-  const handleAddTask = async (taskData: Omit<Task, "id" | "timeLogged">) => {
-    try {
-      await createTask({
-        name: taskData.name,
-        category: taskData.category,
-        status: taskData.status,
-        dueDate: taskData.dueDate,
-      });
-      await loadTasks();
-    } catch (err) {
-      console.error("Failed to create task:", err);
-    }
-  };
-
-  const handleUpdateTask = async (id: string, updates: Partial<Task>) => {
-    try {
-      await updateTask(id, updates);
-      await loadTasks();
-    } catch (err) {
-      console.error("Failed to update task:", err);
-    }
-  };
-
-  const handleDeleteTask = async (id: string) => {
-    try {
-      await deleteTask(id);
-      await loadTasks();
-    } catch (err) {
-      console.error("Failed to delete task:", err);
-    }
+  const handleAddTask = (taskData: Omit<Task, "id" | "timeLogged">) => {
+    setTasks((prev) => [
+      ...prev,
+      { ...taskData, id: generateId(), timeLogged: 0 },
+    ]);
   };
 
   const openModal = () => setShowModal(true);
@@ -74,15 +37,13 @@ export default function App() {
         {activePage === "Dashboard" || activePage === "Tasks" ? (
           <Dashboard
             tasks={tasks}
-            loading={loading}
-            onUpdateTask={handleUpdateTask}
-            onDeleteTask={handleDeleteTask}
+            onTasksChange={setTasks}
             onNewTask={openModal}
           />
         ) : activePage === "Time Tracker" ? (
           <PlaceholderPage title="Time Tracker" description="View detailed time tracking reports and manage your timers." />
         ) : activePage === "Analytics" ? (
-          <PlaceholderPage title="Analytics" description="Analyze your productivity trends and task completion rates." />
+          <Analytics tasks={tasks} />
         ) : (
           <PlaceholderPage title="Settings" description="Configure your TaskFlow Pro preferences and account settings." />
         )}

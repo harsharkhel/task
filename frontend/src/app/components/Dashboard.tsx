@@ -26,9 +26,7 @@ export interface Task {
 
 interface DashboardProps {
   tasks: Task[];
-  loading: boolean;
-  onUpdateTask: (id: string, updates: Partial<Task>) => Promise<void>;
-  onDeleteTask: (id: string) => Promise<void>;
+  onTasksChange: (tasks: Task[]) => void;
   onNewTask: () => void;
 }
 
@@ -76,7 +74,7 @@ const statusColors: Record<TaskStatus, { bg: string; text: string }> = {
   "completed": { bg: "#D1FAE5", text: "#065F46" },
 };
 
-export function Dashboard({ tasks, loading, onUpdateTask, onDeleteTask, onNewTask }: DashboardProps) {
+export function Dashboard({ tasks, onTasksChange, onNewTask }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Today");
   const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -91,63 +89,65 @@ export function Dashboard({ tasks, loading, onUpdateTask, onDeleteTask, onNewTas
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [timerTaskId]);
 
-  const startTimer = async (taskId: string) => {
+  const startTimer = (taskId: string) => {
     if (timerTaskId === taskId) {
-      // stop — save accumulated time to backend
-      const task = tasks.find((t) => t.id === taskId);
-      if (task) {
-        await onUpdateTask(taskId, { timeLogged: task.timeLogged + elapsed });
-      }
+      // stop
+      onTasksChange(
+        tasks.map((t) =>
+          t.id === taskId ? { ...t, timeLogged: t.timeLogged + elapsed } : t
+        )
+      );
       setElapsed(0);
       setTimerTaskId(null);
     } else {
       if (timerTaskId) {
-        // stop current timer first
-        const currentTask = tasks.find((t) => t.id === timerTaskId);
-        if (currentTask) {
-          await onUpdateTask(timerTaskId, { timeLogged: currentTask.timeLogged + elapsed });
-        }
+        onTasksChange(
+          tasks.map((t) =>
+            t.id === timerTaskId ? { ...t, timeLogged: t.timeLogged + elapsed } : t
+          )
+        );
         setElapsed(0);
       }
       setTimerTaskId(taskId);
     }
   };
 
-  const stopGlobalTimer = async () => {
+  const stopGlobalTimer = () => {
     if (timerTaskId) {
-      const task = tasks.find((t) => t.id === timerTaskId);
-      if (task) {
-        await onUpdateTask(timerTaskId, { timeLogged: task.timeLogged + elapsed });
-      }
+      onTasksChange(
+        tasks.map((t) =>
+          t.id === timerTaskId ? { ...t, timeLogged: t.timeLogged + elapsed } : t
+        )
+      );
       setElapsed(0);
       setTimerTaskId(null);
     }
   };
 
-  const markComplete = async (taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
+  const markComplete = (taskId: string) => {
     if (timerTaskId === taskId) {
-      await onUpdateTask(taskId, {
-        status: "completed",
-        timeLogged: task.timeLogged + elapsed,
-      });
+      onTasksChange(
+        tasks.map((t) =>
+          t.id === taskId ? { ...t, status: "completed", timeLogged: t.timeLogged + elapsed } : t
+        )
+      );
       setElapsed(0);
       setTimerTaskId(null);
     } else {
-      await onUpdateTask(taskId, {
-        status: task.status === "completed" ? "pending" : "completed",
-      });
+      onTasksChange(
+        tasks.map((t) =>
+          t.id === taskId ? { ...t, status: t.status === "completed" ? "pending" : "completed" } : t
+        )
+      );
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
+  const deleteTask = (taskId: string) => {
     if (timerTaskId === taskId) {
       setTimerTaskId(null);
       setElapsed(0);
     }
-    await onDeleteTask(taskId);
+    onTasksChange(tasks.filter((t) => t.id !== taskId));
   };
 
   const todayTasks = tasks.filter((t) => t.dueDate === "today");
@@ -338,13 +338,7 @@ export function Dashboard({ tasks, loading, onUpdateTask, onDeleteTask, onNewTas
           </div>
 
           {/* Rows */}
-          {loading ? (
-            <div className="py-12 text-center">
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: "14px", color: "#6B7280" }}>
-                Loading tasks…
-              </p>
-            </div>
-          ) : displayTasks.length === 0 ? (
+          {displayTasks.length === 0 ? (
             <div className="py-12 text-center">
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: "14px", color: "#6B7280" }}>
                 {activeTab === "Today"
@@ -442,7 +436,7 @@ export function Dashboard({ tasks, loading, onUpdateTask, onDeleteTask, onNewTas
                         <Check size={15} />
                       </button>
                       <button
-                        onClick={() => handleDeleteTask(task.id)}
+                        onClick={() => deleteTask(task.id)}
                         title="Delete task"
                         className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
                       >
